@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -48,6 +48,11 @@ interface EntityPageProps<T extends BaseRecord> {
   transitionRoles: readonly UserRole[];
   editableStatuses?: readonly string[];
   deletableStatuses?: readonly string[];
+  // Transition targets that are handled by a dedicated flow and must not appear
+  // in the generic transition dialog (e.g. remelt uses the closed-loop handover).
+  hiddenTargets?: readonly string[];
+  // Extra per-row action buttons rendered after the built-in operations.
+  rowActions?: (item: T) => ReactNode;
   statusRender?: (item: T) => ReactNode;
   footer?: ReactNode;
 }
@@ -79,7 +84,7 @@ function preparePayload(fields: readonly FieldDefinition[], draft: Draft): Recor
 
 export function EntityPage<T extends BaseRecord>({
   path, label, description, useStore, fields, columns, transitions, createRoles, updateRoles, transitionRoles,
-  editableStatuses, deletableStatuses, statusRender, footer,
+  editableStatuses, deletableStatuses, hiddenTargets, rowActions, statusRender, footer,
 }: EntityPageProps<T>) {
   const { items, meta, loading, error, load, createRecord, updateRecord, transition, deleteRecord, clearError } = useStore();
   const { session, hasRole } = useAuth();
@@ -98,7 +103,14 @@ export function EntityPage<T extends BaseRecord>({
   }, [load, pagination.page, pagination.pageSize, path, query]);
 
   const statusKinds = useMemo(() => new Set(items.map((item) => item.status)).size, [items]);
-  const pending = useMemo(() => items.filter((item) => (transitions[item.status] || []).length > 0).length, [items, transitions]);
+  const visibleTargets = useCallback(
+    (status: string) => (transitions[status] || []).filter((target) => !hiddenTargets?.includes(target)),
+    [transitions, hiddenTargets],
+  );
+  const pending = useMemo(
+    () => items.filter((item) => visibleTargets(item.status).length > 0).length,
+    [items, visibleTargets],
+  );
   const canCreate = hasRole(...createRoles);
   const canUpdate = hasRole(...updateRoles);
   const canTransition = hasRole(...transitionRoles);
@@ -117,7 +129,7 @@ export function EntityPage<T extends BaseRecord>({
   }
 
   function openTransition(item: T) {
-    const targets = transitions[item.status] || [];
+    const targets = visibleTargets(item.status);
     setTransitioning(item);
     setTarget(targets[0] || '');
     setReason('');
@@ -177,7 +189,7 @@ export function EntityPage<T extends BaseRecord>({
           </TableRow></TableHead>
           <TableBody>
             {items.map((item) => {
-              const targets = transitions[item.status] || [];
+              const targets = visibleTargets(item.status);
               return <TableRow hover key={item.id}>
                 <TableCell><Typography variant="body2" fontWeight={700}>{item.code}</Typography><Typography variant="caption" color="text.secondary">{item.name}</Typography></TableCell>
                 <TableCell>{statusRender ? statusRender(item) : <StatusBadge status={item.status} />}</TableCell>
@@ -185,6 +197,7 @@ export function EntityPage<T extends BaseRecord>({
                 <TableCell align="right">
                   {canUpdate && (!editableStatuses || editableStatuses.includes(item.status)) && <Tooltip title="编辑"><span><IconButton size="small" onClick={() => openEdit(item)} disabled={loading}><EditOutlinedIcon fontSize="small" /></IconButton></span></Tooltip>}
                   {canTransition && targets.length > 0 && <Tooltip title="状态迁移"><span><IconButton size="small" color="primary" onClick={() => openTransition(item)} disabled={loading}><SyncAltIcon fontSize="small" /></IconButton></span></Tooltip>}
+                  {rowActions?.(item)}
                   {isAdmin && (!deletableStatuses || deletableStatuses.includes(item.status)) && <Tooltip title="删除"><span><IconButton size="small" color="error" onClick={() => setDeleting(item)} disabled={loading}><DeleteOutlineIcon fontSize="small" /></IconButton></span></Tooltip>}
                 </TableCell>
               </TableRow>;
@@ -223,7 +236,7 @@ export function EntityPage<T extends BaseRecord>({
       <DialogTitle>状态迁移 · {transitioning?.code}</DialogTitle>
       <DialogContent dividers className="dialog-stack">
         <TextField select label="目标状态" value={target} onChange={(event) => setTarget(event.target.value)} fullWidth>
-          {(transitioning ? transitions[transitioning.status] || [] : []).map((value) => <MenuItem key={value} value={value}>{value}</MenuItem>)}
+          {(transitioning ? visibleTargets(transitioning.status) : []).map((value) => <MenuItem key={value} value={value}>{value}</MenuItem>)}
         </TextField>
         <TextField label="迁移原因" value={reason} onChange={(event) => setReason(event.target.value)} multiline minRows={3} required fullWidth />
       </DialogContent>

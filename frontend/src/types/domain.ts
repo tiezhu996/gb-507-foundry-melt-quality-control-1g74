@@ -41,6 +41,9 @@ export interface Heat extends BaseRecord {
   phosphorusMaxPct: number;
   startedAt: string;
   evidence: string;
+  // Return-to-furnace traceability.
+  originHeatCode: string;
+  returnedHeatCode: string;
 }
 
 export interface ChemicalSample extends BaseRecord {
@@ -65,6 +68,35 @@ export interface QualityDecision extends BaseRecord {
   conditions: string;
   decidedAt: string;
   evidence: string;
+  remeltFurnaceCode: string;
+  remeltHeatCode: string;
+}
+
+export interface RemeltFurnaceOption {
+  code: string;
+  name: string;
+  status: string;
+  plantArea: string;
+  capacityTonnes: number;
+  maxTemperatureC: number;
+  eligible: boolean;
+  reasons: string[];
+}
+
+export interface RemeltHandoverInput {
+  expectedVersion: number;
+  furnaceCode: string;
+  returnHeatCode: string;
+  returnHeatName: string;
+  reason: string;
+  evidence: string;
+}
+
+export interface RemeltHandoverResult {
+  decision: QualityDecision;
+  originHeat: Heat;
+  returnHeat: Heat;
+  furnace: Furnace;
 }
 
 export interface PageMeta {

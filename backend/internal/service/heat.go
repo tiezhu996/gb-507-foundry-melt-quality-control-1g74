@@ -18,6 +18,7 @@ type HeatService interface {
 	Create(context.Context, dto.CreateHeat, string, string) (model.Heat, error)
 	Update(context.Context, uint, dto.UpdateHeat, string, string) (model.Heat, error)
 	Transition(context.Context, uint, dto.TransitionRequest, string, string) (model.Heat, error)
+	RemeltFurnaces(context.Context, string) ([]dto.RemeltFurnaceOption, error)
 	Delete(context.Context, uint, string, string) error
 	StatusCounts(context.Context) (map[string]int64, error)
 }
@@ -153,6 +154,49 @@ func (s *heatService) Transition(ctx context.Context, id uint, input dto.Transit
 		}
 		return s.repository.Get(txCtx, id)
 	})
+}
+
+// RemeltFurnaces evaluates every furnace against a heat that is awaiting a
+// remelt decision and returns the current承接 candidates together with the
+// precise capability mismatch reasons for the excluded furnaces.
+func (s *heatService) RemeltFurnaces(ctx context.Context, heatCode string) ([]dto.RemeltFurnaceOption, error) {
+	heat, err := s.repository.GetByCode(ctx, normalizeCode(heatCode))
+	if err != nil {
+		return nil, fmt.Errorf("resolve remelt heat: %w", err)
+	}
+	if heat.Status != string(constants.HeatStateHold) {
+		return nil, fmt.Errorf("%w: only a heat on quality hold can be handed over to remelt", ErrInvalidInput)
+	}
+	furnaces, err := s.furnaces.ListAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list remelt furnaces: %w", err)
+	}
+	options := make([]dto.RemeltFurnaceOption, 0, len(furnaces))
+	for _, furnace := range furnaces {
+		option := dto.RemeltFurnaceOption{
+			Code: furnace.Code, Name: furnace.Name, Status: furnace.Status, PlantArea: furnace.PlantArea,
+			CapacityTonnes: furnace.CapacityTonnes, MaxTemperatureC: furnace.MaxTemperatureC,
+			Eligible: true, Reasons: []string{},
+		}
+		if furnace.Status != "available" {
+			option.Eligible = false
+			option.Reasons = append(option.Reasons, fmt.Sprintf("炉台当前状态为 %s，仅 available 炉台可承接", furnace.Status))
+		}
+		if heat.ChargeWeightKg > furnace.CapacityTonnes*1000 {
+			option.Eligible = false
+			option.Reasons = append(option.Reasons, fmt.Sprintf("容量 %.1ft 小于原装料 %.0fkg", furnace.CapacityTonnes, heat.ChargeWeightKg))
+		}
+		if heat.TargetTemperatureC > furnace.MaxTemperatureC {
+			option.Eligible = false
+			option.Reasons = append(option.Reasons, fmt.Sprintf("最高温度 %.0f°C 低于原目标 %.0f°C", furnace.MaxTemperatureC, heat.TargetTemperatureC))
+		}
+		if !alloySupported(furnace.SupportedAlloys, heat.AlloyGrade) {
+			option.Eligible = false
+			option.Reasons = append(option.Reasons, fmt.Sprintf("不支持原牌号 %s", heat.AlloyGrade))
+		}
+		options = append(options, option)
+	}
+	return options, nil
 }
 
 func (s *heatService) Delete(ctx context.Context, id uint, actor, requestID string) error {

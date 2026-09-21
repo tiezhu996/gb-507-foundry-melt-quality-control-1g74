@@ -20,11 +20,12 @@ import (
 func TestDecisionValidatesOwnershipAndAtomicallyFinalizesHeat(t *testing.T) {
 	db := workflowTestDB(t)
 	ctx := context.Background()
+	furnaceRepository := repository.NewFurnaceRepository(db)
 	heatRepository := repository.NewHeatRepository(db)
 	sampleRepository := repository.NewChemicalSampleRepository(db)
 	decisionRepository := repository.NewQualityDecisionRepository(db)
 	security := NewSecurityService(repository.NewSecurityRepository(db), config.Config{AppName: "test", JWTSecret: strings.Repeat("a", 32)})
-	decisions := NewQualityDecisionService(decisionRepository, heatRepository, sampleRepository, security)
+	decisions := NewQualityDecisionService(decisionRepository, heatRepository, furnaceRepository, sampleRepository, security)
 
 	heat := workflowHeat("H-TEST-01")
 	otherHeat := workflowHeat("H-TEST-02")

@@ -31,6 +31,23 @@ docker compose down -v --remove-orphans
 | 化验样本 | `ChemicalSample` | `/api/samples` | collected, testing, verified, rejected |
 | 质量决定 | `QualityDecision` | `/api/decisions` | draft, accept, remelt, scrap |
 
+### 炉次返炉承接闭环
+
+质量负责人把判定签发为**返炉（remelt）**时，必须通过专用闭环接口
+`POST /api/decisions/:id/remelt` 一次提交完成，普通 `transition` 接口不接受 remelt：
+
+1. 校验判定仍为 draft、原炉次仍在 quality hold、终态样本归属一致；
+2. 只能选择**当前 available** 且满足原牌号（`supportedAlloys`）、装料量
+   （`capacityTonnes`）和目标温度（`maxTemperatureC`）的承接炉台；候选清单由
+   `GET /api/heats/remelt-furnaces?heatCode=` 返回，不合规炉台附具体原因；
+3. 同一事务内：原炉次置 `rejected`、判定置 `remelt` 并记录承接地炉台与返炉炉次、
+   生成继承全部冻结成分规格的 `charged` 返炉炉次、承接炉台原子占用为 `charging`；
+4. 无合规炉台、重复提交或并发冲突均整体回滚，不改动炉次、炉台或判定记录，并返回
+   具体原因（业务原因 422、乐观锁/并发冲突 409）。
+
+炉次页显示「原炉次 ↔ 返炉炉次」关系与承接地炉台，质量判定页显示关联结果，刷新后可回读。
+接收（accept）、报废（scrap）和普通炉次流程保持不变。
+
 - JWT 登录和 viewer/operator/reviewer/admin 四级 RBAC。
 - 所有状态变化使用乐观锁并写入不可覆盖的审计日志。
 - 请求 ID、结构化日志、全局错误映射和 Redis 分布式限流。

@@ -18,6 +18,10 @@ type Heat struct {
 	PhosphorusMaxPct   float64   `json:"phosphorusMaxPct" gorm:"not null"`
 	StartedAt          time.Time `json:"startedAt" gorm:"index;not null"`
 	Evidence           string    `json:"evidence" gorm:"size:2000"`
+	// Return-to-furnace traceability. OriginHeatCode is set on the承接 heat
+	// created by a remelt decision; ReturnedHeatCode is set on the rejected原炉次.
+	OriginHeatCode   string `json:"originHeatCode" gorm:"size:64;index"`
+	ReturnedHeatCode string `json:"returnedHeatCode" gorm:"size:64;index"`
 }
 
 func (item *Heat) GetBase() *BaseModel { return &item.BaseModel }

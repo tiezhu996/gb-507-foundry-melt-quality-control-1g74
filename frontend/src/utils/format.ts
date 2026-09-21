@@ -9,6 +9,6 @@ export function nextStatus(current: string, statuses: readonly string[]): string
 export function statusTone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
   if (/approved|accepted|released|completed|signed|closed|pass|ready|online|cleared|succeeded/.test(status)) return 'success';
   if (/failed|rejected|critical|scrap|discard|revoked|urgent/.test(status)) return 'danger';
-  if (/hold|warning|review|pending|restricted|limited|quarantine/.test(status)) return 'warning';
+  if (/hold|remelt|warning|review|pending|restricted|limited|quarantine|charging/.test(status)) return 'warning';
   return 'neutral';
 }

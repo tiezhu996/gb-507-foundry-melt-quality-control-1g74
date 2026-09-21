@@ -11,6 +11,23 @@ import (
 
 var ErrVersionConflict = errors.New("record was changed by another request")
 
+// asVersionConflict maps database-level lock and serialization failures onto
+// the optimistic-lock conflict. SQLite serializes writers with SQLITE_BUSY
+// while PostgreSQL surfaces SQLSTATE 40001/40P01 under concurrent transactions;
+// either way the caller must refresh and retry rather than see a server error.
+func asVersionConflict(err error) error {
+	if err == nil {
+		return nil
+	}
+	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "sqlite_busy") || strings.Contains(text, "database is locked") ||
+		strings.Contains(text, "40001") || strings.Contains(text, "40p01") ||
+		strings.Contains(text, "deadlock detected") || strings.Contains(text, "could not serialize access") {
+		return errors.Join(ErrVersionConflict, err)
+	}
+	return err
+}
+
 type Page[T any] struct {
 	Items    []T   `json:"items"`
 	Total    int64 `json:"total"`
@@ -76,7 +93,7 @@ func (s *Store[T]) Update(ctx context.Context, id, expectedVersion uint, item *T
 		Where("id = ? AND version = ?", id, expectedVersion).
 		Select("*").Omit("id", "code", "created_at", "deleted_at").Updates(item)
 	if result.Error != nil {
-		return result.Error
+		return asVersionConflict(result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return ErrVersionConflict

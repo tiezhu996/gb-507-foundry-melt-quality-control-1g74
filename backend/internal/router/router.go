@@ -36,7 +36,7 @@ func New(cfg config.Config, db *gorm.DB, redisClient *redis.Client, logger *slog
 	furnaceService := service.NewFurnaceService(furnaceRepository, securityService)
 	heatService := service.NewHeatService(heatRepository, furnaceRepository, chemicalSampleRepository, securityService)
 	chemicalSampleService := service.NewChemicalSampleService(chemicalSampleRepository, heatRepository, securityService)
-	qualityDecisionService := service.NewQualityDecisionService(qualityDecisionRepository, heatRepository, chemicalSampleRepository, securityService)
+	qualityDecisionService := service.NewQualityDecisionService(qualityDecisionRepository, heatRepository, furnaceRepository, chemicalSampleRepository, securityService)
 	furnaceHandler := handler.NewFurnaceHandler(furnaceService)
 	heatHandler := handler.NewHeatHandler(heatService)
 	chemicalSampleHandler := handler.NewChemicalSampleHandler(chemicalSampleService)

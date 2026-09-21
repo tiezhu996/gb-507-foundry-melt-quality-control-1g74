@@ -13,6 +13,7 @@ type HeatRepository interface {
 	List(context.Context, dto.PageQuery) (Page[model.Heat], error)
 	Get(context.Context, uint) (model.Heat, error)
 	GetByCode(context.Context, string) (model.Heat, error)
+	ExistsByCode(context.Context, string) (bool, error)
 	Create(context.Context, *model.Heat) error
 	Update(context.Context, uint, uint, *model.Heat) error
 	Delete(context.Context, uint) error
@@ -37,6 +38,11 @@ func (r *heatRepository) GetByCode(ctx context.Context, code string) (model.Heat
 	var item model.Heat
 	err := dbForContext(ctx, r.store.db).Where("code = ?", code).First(&item).Error
 	return item, err
+}
+func (r *heatRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
+	var total int64
+	err := dbForContext(ctx, r.store.db).Model(&model.Heat{}).Where("code = ?", code).Count(&total).Error
+	return total > 0, err
 }
 func (r *heatRepository) Create(ctx context.Context, item *model.Heat) error {
 	return r.store.Create(ctx, item)

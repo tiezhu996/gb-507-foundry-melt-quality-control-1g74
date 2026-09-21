@@ -26,6 +26,7 @@ func (h *QualityDecisionHandler) Register(group *gin.RouterGroup) {
 	resource.POST("", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.create)
 	resource.PUT("/:id", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.update)
 	resource.POST("/:id/transition", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.transition)
+	resource.POST("/:id/remelt", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.remelt)
 	resource.DELETE("/:id", middleware.RequireRoles(model.RoleAdmin), h.remove)
 }
 
@@ -100,6 +101,24 @@ func (h *QualityDecisionHandler) transition(c *gin.Context) {
 		return
 	}
 	util.OK(c, item)
+}
+
+func (h *QualityDecisionHandler) remelt(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var input dto.RemeltHandover
+	if err := c.ShouldBindJSON(&input); err != nil {
+		util.Fail(c, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	result, err := h.service.RemeltHandover(c.Request.Context(), id, input, actorFromContext(c), requestIDFromContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, result)
 }
 
 func (h *QualityDecisionHandler) remove(c *gin.Context) {

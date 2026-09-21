@@ -18,6 +18,7 @@ type QualityDecisionService interface {
 	Create(context.Context, dto.CreateQualityDecision, string, string) (model.QualityDecision, error)
 	Update(context.Context, uint, dto.UpdateQualityDecision, string, string) (model.QualityDecision, error)
 	Transition(context.Context, uint, dto.TransitionRequest, string, string) (model.QualityDecision, error)
+	RemeltHandover(context.Context, uint, dto.RemeltHandover, string, string) (RemeltHandoverResult, error)
 	Delete(context.Context, uint, string, string) error
 	StatusCounts(context.Context) (map[string]int64, error)
 }
@@ -25,13 +26,14 @@ type QualityDecisionService interface {
 type qualityDecisionService struct {
 	repository repository.QualityDecisionRepository
 	heats      repository.HeatRepository
+	furnaces   repository.FurnaceRepository
 	samples    repository.ChemicalSampleRepository
 	security   SecurityService
 }
 
 func NewQualityDecisionService(repo repository.QualityDecisionRepository, heats repository.HeatRepository,
-	samples repository.ChemicalSampleRepository, security SecurityService) QualityDecisionService {
-	return &qualityDecisionService{repository: repo, heats: heats, samples: samples, security: security}
+	furnaces repository.FurnaceRepository, samples repository.ChemicalSampleRepository, security SecurityService) QualityDecisionService {
+	return &qualityDecisionService{repository: repo, heats: heats, furnaces: furnaces, samples: samples, security: security}
 }
 
 func (s *qualityDecisionService) List(ctx context.Context, query dto.PageQuery) (repository.Page[model.QualityDecision], error) {
@@ -123,6 +125,9 @@ func (s *qualityDecisionService) Transition(ctx context.Context, id uint, input 
 			return model.QualityDecision{}, err
 		}
 		target := strings.TrimSpace(input.Status)
+		if target == string(constants.DecisionTypeRemelt) {
+			return model.QualityDecision{}, fmt.Errorf("%w: remelt requires the dedicated handover endpoint that selects a compliant furnace and creates the return heat", ErrInvalidTransition)
+		}
 		if !constants.CanTransition(constants.QualityDecisionTransitions, current.Status, target) {
 			return model.QualityDecision{}, fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, current.Status, target)
 		}

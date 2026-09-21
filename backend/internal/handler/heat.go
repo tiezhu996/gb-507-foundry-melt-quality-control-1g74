@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/blueship581/foundry-melt-quality-control/backend/internal/dto"
 	"github.com/blueship581/foundry-melt-quality-control/backend/internal/middleware"
@@ -20,6 +21,7 @@ func NewHeatHandler(s service.HeatService) *HeatHandler {
 func (h *HeatHandler) Register(group *gin.RouterGroup) {
 	resource := group.Group("/heats")
 	resource.GET("", h.list)
+	resource.GET("/remelt-furnaces", h.remeltFurnaces)
 	resource.GET("/:id", h.get)
 	resource.POST("", middleware.RequireRoles(model.RoleOperator, model.RoleReviewer, model.RoleAdmin), h.create)
 	resource.PUT("/:id", middleware.RequireRoles(model.RoleOperator, model.RoleReviewer, model.RoleAdmin), h.update)
@@ -35,6 +37,20 @@ func (h *HeatHandler) list(c *gin.Context) {
 		return
 	}
 	util.Page(c, result.Items, result.Page, result.PageSize, result.Total)
+}
+
+func (h *HeatHandler) remeltFurnaces(c *gin.Context) {
+	heatCode := strings.TrimSpace(c.Query("heatCode"))
+	if heatCode == "" {
+		util.Fail(c, http.StatusBadRequest, "invalid_request", "heatCode query parameter is required")
+		return
+	}
+	options, err := h.service.RemeltFurnaces(c.Request.Context(), heatCode)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, options)
 }
 
 func (h *HeatHandler) get(c *gin.Context) {
