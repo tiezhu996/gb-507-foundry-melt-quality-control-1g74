@@ -126,3 +126,20 @@ func normalizePage(page, pageSize int) (int, int) {
 	}
 	return page, pageSize
 }
+
+// AlloySupported mirrors the service-level furnace capability check so the
+// remelt eligibility query can filter by declared alloy support without
+// importing the service package (which would create an import cycle).
+func AlloySupported(supported, requested string) bool {
+	target := strings.ToUpper(strings.TrimSpace(requested))
+	for _, alloy := range strings.FieldsFunc(supported, func(r rune) bool { return r == ',' || r == ';' || r == '/' }) {
+		if strings.ToUpper(strings.TrimSpace(alloy)) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func alloySupportedAlloy(supported, requested string) bool {
+	return AlloySupported(supported, requested)
+}

@@ -41,6 +41,12 @@ export interface Heat extends BaseRecord {
   phosphorusMaxPct: number;
   startedAt: string;
   evidence: string;
+  // Lineage for the "判定返炉" closed loop.
+  // remeltOfCode is set on the return heat and points at the rejected origin.
+  remeltOfCode?: string;
+  // remeltedIntoCode is set on the rejected origin and points at the heat
+  // that carried the charge forward.
+  remeltedIntoCode?: string;
 }
 
 export interface ChemicalSample extends BaseRecord {
@@ -64,6 +70,34 @@ export interface QualityDecision extends BaseRecord {
   reason: string;
   conditions: string;
   decidedAt: string;
+  evidence: string;
+  // Populated once a remelt decision closes its loop; empty otherwise.
+  remeltHeatCode?: string;
+  remeltFurnaceCode?: string;
+  remeltedAt?: string | null;
+}
+
+// Furnace currently eligible to receive a rejected heat (available and covering
+// the heat's alloy grade, charge weight and target temperature).
+export interface RemeltFurnaceOption {
+  code: string;
+  name: string;
+  plantArea: string;
+  furnaceType: string;
+  capacityTonnes: number;
+  maxTemperatureC: number;
+  status: string;
+  operator: string;
+}
+
+// Request body for POST /decisions/:id/remelt.
+export interface RemeltInput {
+  expectedVersion: number;
+  reason: string;
+  furnaceCode: string;
+  returnHeatCode: string;
+  returnHeatName: string;
+  owner: string;
   evidence: string;
 }
 

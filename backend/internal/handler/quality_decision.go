@@ -23,9 +23,11 @@ func (h *QualityDecisionHandler) Register(group *gin.RouterGroup) {
 	resource := group.Group("/decisions")
 	resource.GET("", h.list)
 	resource.GET("/:id", h.get)
+	resource.GET("/:id/remelt-furnaces", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.remeltFurnaces)
 	resource.POST("", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.create)
 	resource.PUT("/:id", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.update)
 	resource.POST("/:id/transition", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.transition)
+	resource.POST("/:id/remelt", middleware.RequireRoles(model.RoleReviewer, model.RoleAdmin), h.remelt)
 	resource.DELETE("/:id", middleware.RequireRoles(model.RoleAdmin), h.remove)
 }
 
@@ -50,6 +52,21 @@ func (h *QualityDecisionHandler) get(c *gin.Context) {
 		return
 	}
 	util.OK(c, item)
+}
+
+// remeltFurnaces returns the currently compliant furnaces for the decision's
+// heat so the UI can present a constrained choice.
+func (h *QualityDecisionHandler) remeltFurnaces(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	options, err := h.service.EligibleFurnaces(c.Request.Context(), id)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, options)
 }
 
 func (h *QualityDecisionHandler) create(c *gin.Context) {
@@ -95,6 +112,27 @@ func (h *QualityDecisionHandler) transition(c *gin.Context) {
 		return
 	}
 	item, err := h.service.Transition(c.Request.Context(), id, input, actorFromContext(c), requestIDFromContext(c))
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	util.OK(c, item)
+}
+
+// remelt signs the decision as remelt and closes the return-heat loop in one
+// submission. Business-rule failures (no compliant furnace, duplicate,
+// concurrent change) return 422 with a specific reason and change nothing.
+func (h *QualityDecisionHandler) remelt(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var input dto.RemeltRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		util.Fail(c, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	item, err := h.service.Remelt(c.Request.Context(), id, input, actorFromContext(c), requestIDFromContext(c))
 	if err != nil {
 		handleError(c, err)
 		return

@@ -26,12 +26,31 @@ const columns: readonly ColumnDefinition<Heat>[] = [
   { key: 'furnace', label: '炉台 / 牌号', minWidth: 140, render: (item) => <><Typography variant="body2" fontWeight={600}>{item.furnaceCode}</Typography><Typography variant="caption" color="text.secondary">{item.alloyGrade}</Typography></> },
   { key: 'process', label: '装料 / 温度', minWidth: 130, render: (item) => <><Typography variant="body2">{item.chargeWeightKg.toLocaleString()} kg</Typography><Typography variant="caption" color="text.secondary">{item.targetTemperatureC.toFixed(0)} °C</Typography></> },
   { key: 'chemistry', label: '冻结规格', minWidth: 220, render: (item) => <Typography variant="caption">C {item.carbonMinPct.toFixed(3)}-{item.carbonMaxPct.toFixed(3)} · Si {item.siliconMinPct.toFixed(3)}-{item.siliconMaxPct.toFixed(3)}<br />S ≤ {item.sulfurMaxPct.toFixed(3)} · P ≤ {item.phosphorusMaxPct.toFixed(3)}</Typography> },
+  {
+    key: 'lineage', label: '返炉承接关系', minWidth: 190,
+    render: (item) => {
+      if (item.remeltOfCode) {
+        return <dl className="remelt-link">
+          <dt>承接自原炉次</dt><dd>{item.remeltOfCode}</dd>
+          <dt>承接地炉台</dt><dd>{item.furnaceCode}</dd>
+          <dt>开炉时间</dt><dd>{formatDate(item.startedAt)}</dd>
+        </dl>;
+      }
+      if (item.remeltedIntoCode) {
+        return <dl className="remelt-link">
+          <dt>已返炉至</dt><dd>{item.remeltedIntoCode}</dd>
+          <dt>原炉台</dt><dd>{item.furnaceCode}</dd>
+        </dl>;
+      }
+      return <Typography variant="caption" color="text.secondary">普通炉次</Typography>;
+    },
+  },
   { key: 'owner', label: '责任 / 开炉', minWidth: 170, render: (item) => <><Typography variant="body2">{item.owner}</Typography><Typography variant="caption" color="text.secondary">{formatDate(item.startedAt)}</Typography></> },
 ];
 
 export default function HeatPage() {
   return <EntityPage
-    path="heats" label="炉次工作台" description="按冻结成分规格推进熔炼、取样、质量待判与最终决定。"
+    path="heats" label="炉次工作台" description="按冻结成分规格推进熔炼、取样、质量待判与最终决定；返炉炉次展示原炉次关系与承接地。"
     useStore={useHeatStore} fields={fields} columns={columns} transitions={HEAT_TRANSITIONS}
     createRoles={['operator', 'reviewer', 'admin']} updateRoles={['operator', 'reviewer', 'admin']} transitionRoles={['operator', 'reviewer', 'admin']}
     editableStatuses={['charged']} deletableStatuses={['charged']}

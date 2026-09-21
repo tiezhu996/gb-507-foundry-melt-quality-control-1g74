@@ -49,6 +49,8 @@ interface EntityPageProps<T extends BaseRecord> {
   editableStatuses?: readonly string[];
   deletableStatuses?: readonly string[];
   statusRender?: (item: T) => ReactNode;
+  /** Optional entity-specific action rendered per row (e.g. remelt closed loop). */
+  extraRowActions?: (item: T) => ReactNode;
   footer?: ReactNode;
 }
 
@@ -79,7 +81,7 @@ function preparePayload(fields: readonly FieldDefinition[], draft: Draft): Recor
 
 export function EntityPage<T extends BaseRecord>({
   path, label, description, useStore, fields, columns, transitions, createRoles, updateRoles, transitionRoles,
-  editableStatuses, deletableStatuses, statusRender, footer,
+  editableStatuses, deletableStatuses, statusRender, extraRowActions, footer,
 }: EntityPageProps<T>) {
   const { items, meta, loading, error, load, createRecord, updateRecord, transition, deleteRecord, clearError } = useStore();
   const { session, hasRole } = useAuth();
@@ -185,6 +187,7 @@ export function EntityPage<T extends BaseRecord>({
                 <TableCell align="right">
                   {canUpdate && (!editableStatuses || editableStatuses.includes(item.status)) && <Tooltip title="编辑"><span><IconButton size="small" onClick={() => openEdit(item)} disabled={loading}><EditOutlinedIcon fontSize="small" /></IconButton></span></Tooltip>}
                   {canTransition && targets.length > 0 && <Tooltip title="状态迁移"><span><IconButton size="small" color="primary" onClick={() => openTransition(item)} disabled={loading}><SyncAltIcon fontSize="small" /></IconButton></span></Tooltip>}
+                  {extraRowActions?.(item)}
                   {isAdmin && (!deletableStatuses || deletableStatuses.includes(item.status)) && <Tooltip title="删除"><span><IconButton size="small" color="error" onClick={() => setDeleting(item)} disabled={loading}><DeleteOutlineIcon fontSize="small" /></IconButton></span></Tooltip>}
                 </TableCell>
               </TableRow>;
